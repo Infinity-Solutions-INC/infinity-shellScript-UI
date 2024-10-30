@@ -22,7 +22,7 @@ version: '3.8'
 
 services:
   mysql-app:
-    image: mysql:latest
+    image: mysql:5.7
     environment:
       MYSQL_ROOT_PASSWORD: 'rootpassword'
       MYSQL_DATABASE: 'infinity_solutions'
@@ -73,16 +73,28 @@ WORKDIR /app
 
 RUN apt update && apt install -y cron
 
+COPY .env /etc/enviroment
 COPY conexao-banco-de-dados-1.0-SNAPSHOT-jar-with-dependencies.jar .
+COPY script_java.sh .
 
 
-RUN echo "* * * * * /usr/local/openjdk-21/bin/java -jar /app/conexao-banco-de-dados-1.0-SNAPSHOT-jar-with-dependencies.jar &&  cp arquivo.log /app/output/" > /etc/cron.d/app-cron
+RUN echo "* * * * * sh /app/script_java.sh &&  cp /root/arquivo.log /app/output/" > /etc/cron.d/app-cron
 RUN chmod 664 /etc/cron.d/app-cron
+
 
 RUN crontab /etc/cron.d/app-cron
 
 CMD ["cron", "-f"]
 
+EOF
+##########################################################################
+############script java para variaveis de ambiente########################
+cat <<EOF > script_java.sh
+
+export AWS_ACCESS_KEY_ID=*************
+export AWS_SECRET_ACCESS_KEY=***********
+export AWS_SESSION_TOKEN=***********
+/usr/local/openjdk-21/bin/java -jar /app/conexao-banco-de-dados-1.0-SNAPSHOT-jar-with-dependencies.jar
 EOF
 ##########################################################################
 ############Definição variaveis de ambiente###############################
@@ -102,5 +114,3 @@ APP_HOST=localhost
 " > .env.dev
 ########################################################################################
 docker-compose up -d --build
-
-
