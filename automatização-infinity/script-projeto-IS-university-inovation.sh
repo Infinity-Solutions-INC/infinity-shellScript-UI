@@ -3,7 +3,10 @@ sudo apt upgrade
 sudo apt install docker.io -y
 sudo apt install docker-compose -y
 sudo apt install npm -y
-cd
+cd /etc/projeto
+sudo docker-compose down
+cd /etc
+sudo rm -rf projeto
 mkdir /etc/projeto
 cd /etc/projeto
 git clone https://github.com/Infinity-Solutions-INC/institucional-infinitySolutions.git
@@ -14,7 +17,9 @@ npm install
 rm .env.dev .env
 cd -
 mv infinity-solutions-DB/script_infinitySolutions.sql .
-mv infinity-javaConnection-comLog/conexao-banco-de-dados-1.0-SNAPSHOT-jar-with-dependencies.jar .
+mv infinity-javaConnection-comLog/etl-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar .
+mv infinity-javaConnection-comLog/slack-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar .
+mv infinity-javaConnection-comLog/AI-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar .
 
 ################################Definição Compose######################################
 cat <<EOF > docker-compose.yml
@@ -22,7 +27,7 @@ version: '3.8'
 
 services:
   mysql-app:
-    image: mysql:5.7
+    image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: 'rootpassword'
       MYSQL_DATABASE: 'infinity_solutions'
@@ -40,7 +45,7 @@ services:
     env_file:
       - .env.dev
     ports:
-      - 3333:3333
+      - 80:80
     command: ["npm", "start"]
     depends_on:
       - mysql-app
@@ -73,12 +78,18 @@ WORKDIR /app
 
 RUN apt update && apt install -y cron
 
-COPY .env /etc/enviroment
-COPY conexao-banco-de-dados-1.0-SNAPSHOT-jar-with-dependencies.jar .
-COPY script_java.sh .
+COPY AI-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar .
+COPY slack-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar .
+COPY etl-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar .
+COPY script_java_etl.sh .
+COPY script_java_slack.sh .
+COPY script_java_ai.sh .
+
+RUN echo "* * * * * sh /app/script_java_etl.sh" >> /etc/cron.d/app-cron
+RUN echo "* * * * * sh /app/script_java_slack.sh" >> /etc/cron.d/app-cron
+RUN echo "* * * * * sh /app/script_java_ai.sh" >> /etc/cron.d/app-cron
 
 
-RUN echo "* * * * * sh /app/script_java.sh &&  cp /root/arquivo.log /app/output/" > /etc/cron.d/app-cron
 RUN chmod 664 /etc/cron.d/app-cron
 
 
@@ -89,28 +100,60 @@ CMD ["cron", "-f"]
 EOF
 ##########################################################################
 ############script java para variaveis de ambiente########################
-cat <<EOF > script_java.sh
+cat <<EOF > script_java_etl.sh
 
-export AWS_ACCESS_KEY_ID=*************
-export AWS_SECRET_ACCESS_KEY=***********
-export AWS_SESSION_TOKEN=***********
-/usr/local/openjdk-21/bin/java -jar /app/conexao-banco-de-dados-1.0-SNAPSHOT-jar-with-dependencies.jar
+export AWS_ACCESS_KEY_ID=********
+export AWS_SECRET_ACCESS_KEY=********
+export AWS_SESSION_TOKEN=********
+
+export DB_USER=********
+export DB_PASSWORD=********
+
+/usr/local/openjdk-21/bin/java -jar /app/etl-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+EOF
+##########################################################################
+############script java-slack para variaveis de ambiente########################
+cat <<EOF > script_java_slack.sh
+
+export TOKEN_ERROR=********
+export TOKEN_RECOMENDACAO=********
+
+export DB_USER=********
+export DB_PASSWORD=********
+
+/usr/local/openjdk-21/bin/java -jar /app/slack-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar
+
+EOF
+##########################################################################
+############script java-ai para variaveis de ambiente########################
+cat <<EOF > script_java_ai.sh
+
+export DB_USER=********
+export DB_PASSWORD=********
+
+export API_KEY=AIzaSyDtNqyQtgMPJSvGh457ZVv2rTPcglgcBWc
+
+/usr/local/openjdk-21/bin/java -jar /app/AI-infinity-1.0-SNAPSHOT-jar-with-dependencies.jar
+
 EOF
 ##########################################################################
 ############Definição variaveis de ambiente###############################
 echo "AMBIENTE_PROCESSO=desenvolvimento
 # Configurações de conexão com o banco de dados
-DB_HOST='mysql-app'
-DB_DATABASE='infinity_solutions'
-DB_USER='root'
-DB_PASSWORD='rootpassword'
+DB_HOST=********'
+DB_DATABASE='********'
+DB_USER='********'
+DB_PASSWORD='********'
+##########################################################################
 DB_PORT=3306
 
 # Configurações do servidor de aplicação
-APP_PORT=3333
+APP_PORT=80
 APP_HOST=localhost
 
 # importante: caso sua senha contenha caracteres especiais, insira-a entre 'aspas'
 " > .env.dev
 ########################################################################################
 docker-compose up -d --build
+
